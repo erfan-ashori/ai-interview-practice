@@ -50,7 +50,6 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Transcription successful');
     console.log('📝 Transcribed text:', transcription.text);
-    console.log('Text preview:', transcription.text.substring(0, 100) + (transcription.text.length > 100 ? '...' : ''));
 
     return NextResponse.json({ text: transcription.text });
   } catch (error: any) {

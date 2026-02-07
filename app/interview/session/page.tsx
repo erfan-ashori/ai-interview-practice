@@ -77,7 +77,12 @@ export default function InterviewSessionPage() {
       }
 
       // Create a new blob with explicit MIME type if needed
-      const finalBlob = audioBlob.type ? audioBlob : new Blob([audioBlob], { type: 'audio/mpeg' });
+      let finalBlob = audioBlob;
+      if (!audioBlob.type) {
+        console.warn('⚠️ Audio blob missing MIME type, setting to audio/mpeg');
+        finalBlob = new Blob([audioBlob], { type: 'audio/mpeg' });
+      }
+      
       const audioUrl = URL.createObjectURL(finalBlob);
       console.log('🔗 Created audio URL:', audioUrl);
 

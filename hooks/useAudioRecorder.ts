@@ -31,7 +31,7 @@ export function useAudioRecorder() {
       let selectedMimeType = '';
       console.log('🔍 Testing MIME type support:');
       for (const mimeType of mimeTypes) {
-        const isSupported = mimeType === '' || (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(mimeType));
+        const isSupported = mimeType === '' || MediaRecorder.isTypeSupported(mimeType);
         console.log(`  ${mimeType || '(browser default)'}: ${isSupported ? '✅' : '❌'}`);
         if (isSupported) {
           selectedMimeType = mimeType;
