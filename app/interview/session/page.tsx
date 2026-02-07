@@ -45,16 +45,46 @@ export default function InterviewSessionPage() {
         body: JSON.stringify({ text }),
       });
 
+      if (!response.ok) {
+        console.error('TTS request failed:', response.statusText);
+        setIsAISpeaking(false);
+        return;
+      }
+
       const audioBlob = await response.blob();
+
+      // Check if blob is valid
+      if (audioBlob.size === 0) {
+        console.error('Received empty audio blob');
+        setIsAISpeaking(false);
+        return;
+      }
+
       const audioUrl = URL.createObjectURL(audioBlob);
 
       if (audioPlayerRef.current) {
         audioPlayerRef.current.src = audioUrl;
+        audioPlayerRef.current.volume = 1.0;
+        audioPlayerRef.current.preload = 'auto';
+
         audioPlayerRef.current.onended = () => {
+          console.log('Audio playback finished');
           setIsAISpeaking(false);
           URL.revokeObjectURL(audioUrl);
         };
+
+        audioPlayerRef.current.onerror = (e) => {
+          console.error('Audio playback error:', e);
+          setIsAISpeaking(false);
+          URL.revokeObjectURL(audioUrl);
+        };
+
+        audioPlayerRef.current.oncanplay = () => {
+          console.log('Audio ready to play');
+        };
+
         await audioPlayerRef.current.play();
+        console.log('Audio playing...');
       }
     } catch (error) {
       console.error('Failed to play AI response:', error);
@@ -121,7 +151,18 @@ export default function InterviewSessionPage() {
         body: formData,
       });
 
+      if (!transcribeResponse.ok) {
+        throw new Error('Transcription failed');
+      }
+
       const { text } = await transcribeResponse.json();
+
+      if (!text || text.trim() === '') {
+        console.warn('Empty transcription received');
+        setIsProcessing(false);
+        clearAudio();
+        return;
+      }
 
       // Add user message to conversation
       const userMessage: Message = {
@@ -144,6 +185,10 @@ export default function InterviewSessionPage() {
           difficulty,
         }),
       });
+
+      if (!chatResponse.ok) {
+        throw new Error('Chat request failed');
+      }
 
       const { response: aiResponse } = await chatResponse.json();
 
@@ -207,19 +252,41 @@ export default function InterviewSessionPage() {
         },
         body: JSON.stringify({
           conversationHistory,
-          sessionId,
+          interviewType,
+          difficulty,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate feedback');
+        console.error('Feedback generation failed');
+        // Continue to results page anyway with whatever data we have
       }
+
+      const feedbackData = await response.json();
+
+      // Save session to database
+      await fetch('/api/sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sessionId,
+          conversationHistory,
+          feedback: feedbackData,
+          interviewType,
+          difficulty,
+          status: 'completed',
+        }),
+      });
 
       // Navigate to results page
       router.push(`/interview/results/${sessionId}`);
     } catch (error) {
       console.error('Failed to end interview:', error);
-      alert('Failed to generate feedback. Please try again.');
+      
+      // Still navigate to results even if feedback fails
+      router.push(`/interview/results/${sessionId}`);
     }
   };
 
