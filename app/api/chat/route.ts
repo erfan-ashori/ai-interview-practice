@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       stack: error.stack
     });
     return NextResponse.json(
-      { error: error.message || 'Failed to generate response' },
+      { error: 'Failed to generate response' },
       { status: 500 }
     );
   }

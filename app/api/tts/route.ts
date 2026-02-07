@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       stack: error.stack
     });
     return NextResponse.json(
-      { error: 'Failed to generate speech', details: error.message },
+      { error: 'Failed to generate speech' },
       { status: 500 }
     );
   }

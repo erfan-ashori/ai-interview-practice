@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       stack: error.stack
     });
     
-    // Provide more specific error messages
+    // Provide more specific error messages without exposing internal details
     let errorMessage = 'Failed to transcribe audio';
     if (error.message?.includes('Invalid file format')) {
       errorMessage = 'Invalid audio format. Please ensure the audio is recorded properly.';
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     }
     
     return NextResponse.json(
-      { error: errorMessage, details: error.message },
+      { error: errorMessage },
       { status: 500 }
     );
   }
