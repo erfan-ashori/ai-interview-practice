@@ -30,12 +30,20 @@ export default function InterviewSessionPage() {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
-  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const { isRecording: isAudioRecording, audioBlob, startRecording, stopRecording, clearAudio } = useAudioRecorder();
 
   const playAIResponse = useCallback(async (text: string) => {
     try {
+      console.log('🔊 Starting TTS playback for text:', text.substring(0, 50) + '...');
       setIsAISpeaking(true);
+
+      // Stop any currently playing audio
+      if (currentAudioRef.current) {
+        console.log('⏹️ Stopping previous audio');
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
 
       const response = await fetch('/api/tts', {
         method: 'POST',
@@ -46,49 +54,89 @@ export default function InterviewSessionPage() {
       });
 
       if (!response.ok) {
-        console.error('TTS request failed:', response.statusText);
+        const errorText = await response.text();
+        console.error('❌ TTS request failed:', response.status, response.statusText, errorText);
         setIsAISpeaking(false);
         return;
       }
+
+      const contentType = response.headers.get('Content-Type');
+      console.log('📦 TTS response Content-Type:', contentType);
 
       const audioBlob = await response.blob();
+      console.log('📦 Received audio blob:', {
+        size: audioBlob.size,
+        type: audioBlob.type
+      });
 
-      // Check if blob is valid
-      if (audioBlob.size === 0) {
-        console.error('Received empty audio blob');
+      // Validate blob
+      if (!audioBlob || audioBlob.size === 0) {
+        console.error('❌ Received empty or invalid audio blob');
         setIsAISpeaking(false);
         return;
       }
 
-      const audioUrl = URL.createObjectURL(audioBlob);
+      // Create a new blob with explicit MIME type if needed
+      const finalBlob = audioBlob.type ? audioBlob : new Blob([audioBlob], { type: 'audio/mpeg' });
+      const audioUrl = URL.createObjectURL(finalBlob);
+      console.log('🔗 Created audio URL:', audioUrl);
 
-      if (audioPlayerRef.current) {
-        audioPlayerRef.current.src = audioUrl;
-        audioPlayerRef.current.volume = 1.0;
-        audioPlayerRef.current.preload = 'auto';
+      // Create a new Audio element for each playback
+      const audio = new Audio(audioUrl);
+      audio.volume = 1.0;
+      audio.preload = 'auto';
+      currentAudioRef.current = audio;
 
-        audioPlayerRef.current.onended = () => {
-          console.log('Audio playback finished');
-          setIsAISpeaking(false);
-          URL.revokeObjectURL(audioUrl);
-        };
+      // Set up event handlers
+      audio.oncanplay = () => {
+        console.log('✅ Audio ready to play');
+      };
 
-        audioPlayerRef.current.onerror = (e) => {
-          console.error('Audio playback error:', e);
-          setIsAISpeaking(false);
-          URL.revokeObjectURL(audioUrl);
-        };
+      audio.onloadedmetadata = () => {
+        console.log('📊 Audio metadata loaded, duration:', audio.duration);
+      };
 
-        audioPlayerRef.current.oncanplay = () => {
-          console.log('Audio ready to play');
-        };
+      audio.onended = () => {
+        console.log('✅ Audio playback finished');
+        setIsAISpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+        currentAudioRef.current = null;
+      };
 
-        await audioPlayerRef.current.play();
-        console.log('Audio playing...');
-      }
-    } catch (error) {
-      console.error('Failed to play AI response:', error);
+      audio.onerror = (e) => {
+        console.error('❌ Audio playback error:', e);
+        if (audio.error) {
+          console.error('Audio error details:', {
+            code: audio.error.code,
+            message: audio.error.message,
+            MEDIA_ERR_ABORTED: audio.error.MEDIA_ERR_ABORTED,
+            MEDIA_ERR_NETWORK: audio.error.MEDIA_ERR_NETWORK,
+            MEDIA_ERR_DECODE: audio.error.MEDIA_ERR_DECODE,
+            MEDIA_ERR_SRC_NOT_SUPPORTED: audio.error.MEDIA_ERR_SRC_NOT_SUPPORTED
+          });
+        }
+        setIsAISpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+        currentAudioRef.current = null;
+      };
+
+      // Play the audio
+      console.log('▶️ Starting audio playback...');
+      await audio.play();
+      console.log('✅ Audio playing...');
+    } catch (error: any) {
+      console.error('❌ Failed to play AI response:', error);
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       setIsAISpeaking(false);
+      
+      // Clean up if there's an error
+      if (currentAudioRef.current) {
+        currentAudioRef.current = null;
+      }
     }
   }, [setIsAISpeaking]);
 
@@ -303,8 +351,6 @@ export default function InterviewSessionPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted">
-      <audio ref={audioPlayerRef} className="hidden" />
-
       {/* Header */}
       <div className="border-b bg-background/95 backdrop-blur">
         <div className="container mx-auto px-4 py-4">

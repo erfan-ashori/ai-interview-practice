@@ -6,11 +6,25 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { message, conversationHistory, interviewType, difficulty } = body;
 
-    console.log('Chat request:', { message, interviewType, difficulty });
+    console.log('💬 Chat request:', { 
+      messageLength: message?.length, 
+      interviewType, 
+      difficulty,
+      historyLength: conversationHistory?.length 
+    });
 
-    if (!message) {
+    if (!message || typeof message !== 'string') {
+      console.error('❌ Chat: No message provided or invalid type');
       return NextResponse.json(
-        { error: 'No message provided' },
+        { error: 'No message provided or invalid type' },
+        { status: 400 }
+      );
+    }
+
+    if (!interviewType || !difficulty) {
+      console.error('❌ Chat: Missing interview type or difficulty');
+      return NextResponse.json(
+        { error: 'Interview type and difficulty are required' },
         { status: 400 }
       );
     }
@@ -33,12 +47,14 @@ export async function POST(request: NextRequest) {
     ];
 
     // Add conversation history
-    if (conversationHistory && conversationHistory.length > 0) {
+    if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
       conversationHistory.forEach((msg: any) => {
-        messages.push({
-          role: msg.role,
-          content: msg.content,
-        });
+        if (msg && msg.role && msg.content) {
+          messages.push({
+            role: msg.role,
+            content: msg.content,
+          });
+        }
       });
     }
 
@@ -48,7 +64,7 @@ export async function POST(request: NextRequest) {
       content: message,
     });
 
-    console.log('Sending to OpenAI with', messages.length, 'messages');
+    console.log('📤 Sending to OpenAI with', messages.length, 'messages');
 
     // Call OpenAI
     const completion = await openai.chat.completions.create({
@@ -58,13 +74,27 @@ export async function POST(request: NextRequest) {
       max_tokens: 500,
     });
 
-    const response = completion.choices[0].message.content;
+    const response = completion.choices[0]?.message?.content;
 
-    console.log('OpenAI response received:', response?.substring(0, 100) + '...');
+    if (!response) {
+      console.error('❌ No response from OpenAI');
+      return NextResponse.json(
+        { error: 'No response from AI' },
+        { status: 500 }
+      );
+    }
+
+    console.log('✅ OpenAI response received, length:', response.length);
+    console.log('Response preview:', response.substring(0, 100) + (response.length > 100 ? '...' : ''));
 
     return NextResponse.json({ response });
   } catch (error: any) {
-    console.error('Chat API error:', error);
+    console.error('❌ Chat API error:', error);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
     return NextResponse.json(
       { error: error.message || 'Failed to generate response' },
       { status: 500 }
