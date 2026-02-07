@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { use } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,9 +11,8 @@ import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, RotateCcw, Loader2 } from 'lucide-react';
 import type { InterviewSession } from '@/types';
 
-export default function ResultsPage() {
-  const params = useParams();
-  const sessionId = params.id as string;
+export default function ResultsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: sessionId } = use(params);
 
   const [session, setSession] = useState<InterviewSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
