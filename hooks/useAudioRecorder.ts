@@ -44,14 +44,16 @@ export function useAudioRecorder() {
       console.log('📝 Creating MediaRecorder with options:', options);
 
       let mediaRecorder: MediaRecorder;
+      let actualMimeType = selectedMimeType; // Track the actual MIME type being used
       try {
         mediaRecorder = new MediaRecorder(stream, options);
         console.log('✅ MediaRecorder created successfully with selected MIME type');
-      } catch (createError: any) {
-        console.warn('⚠️ Failed to create MediaRecorder with selected MIME type:', createError.message);
+      } catch (createError: unknown) {
+        const error = createError as Error;
+        console.warn('⚠️ Failed to create MediaRecorder with selected MIME type:', error.message);
         console.log('🔄 Retrying with browser default (no MIME type)...');
         mediaRecorder = new MediaRecorder(stream); // Try with browser default
-        selectedMimeType = ''; // Update to reflect we're using default
+        actualMimeType = ''; // Update to reflect we're using default
         console.log('✅ MediaRecorder created with browser default');
       }
       
@@ -73,7 +75,7 @@ export function useAudioRecorder() {
           return;
         }
         const blob = new Blob(chunksRef.current, {
-          type: selectedMimeType || 'audio/webm'
+          type: actualMimeType || 'audio/webm'
         });
         console.log('🎵 Final blob created:', {
           size: blob.size,
@@ -100,14 +102,16 @@ export function useAudioRecorder() {
       try {
         mediaRecorder.start(1000); // Request data every 1 second
         console.log('✅ MediaRecorder.start(1000) called successfully');
-      } catch (startError: any) {
-        console.warn('⚠️ Failed to start with time slice, trying without parameter:', startError.message);
+      } catch (startError: unknown) {
+        const error = startError as Error;
+        console.warn('⚠️ Failed to start with time slice, trying without parameter:', error.message);
         try {
           mediaRecorder.start(); // Try without time slice parameter
           console.log('✅ MediaRecorder.start() called successfully (no time slice)');
-        } catch (fallbackError: any) {
-          console.error('❌ Failed to start MediaRecorder even without time slice:', fallbackError);
-          throw fallbackError; // Re-throw to be caught by outer catch
+        } catch (fallbackError: unknown) {
+          const fbError = fallbackError as Error;
+          console.error('❌ Failed to start MediaRecorder even without time slice:', fbError);
+          throw fbError; // Re-throw to be caught by outer catch
         }
       }
       
